@@ -1,41 +1,51 @@
 ---
 name: studio
-description: Orquesta un brief de imagen en GIMP de punta a punta con el MCP gimp. Entrada única; no salta la revisión ni la exportación.
+description: Entrada única de GIMP Studio. Enruta el brief a la skill de etapa y cierra siempre con review y export.
 ---
 
 # studio
 
-Requiere el servidor MCP `gimp` activo (`gimp-mcp` con argumentos `serve`), paquete `twelvetake-gimp-studio-mcp`.
+Requiere el servidor MCP `gimp` (`gimp-mcp serve`).
 
 ## Cuándo usar
 
-Cualquier encargo en lenguaje natural que deba acabar en un archivo: abrir, retocar, DTF o entregar. Es la entrada única. `open`, `edit`, `dtf`, `review` y `export` son etapas.
+Cualquier encargo en lenguaje natural: “aclara las sombras”, “suaviza la piel”, “quita el fondo”, “está desenfocada”, “recórtala para Instagram”, “prepáralo para DTF”, “guárdala para la web”. Sin una skill de etapa, empieza aquí.
+
+## Diagnóstico
+
+1. `status`. Si falla, para y pide `gimp-mcp doctor`.
+2. Sigue `open` si aún no hay imagen activa.
+3. `get_metadata` y `get_bitmap`. Si el cambio es de tono o de ruido, `histogram` (`channel` `value`, y `red`/`green`/`blue` si hay dominante).
 
 ## Pasos
 
-1. Escribe un plan corto: archivo de entrada, cambios, skill de etapa (`edit` o `dtf`) y ruta de salida.
-2. Llama a `status`. Si falla, para y pide `gimp-mcp doctor`. No improvises Python.
-3. Sigue la skill `open`.
-4. `checkpoint` con una etiqueta del brief. El retroceso es `restore`, no `undo`.
-5. Si el brief es DTF o impresión, sigue `dtf`. Si es edición general, sigue `edit`. Si mezcla ambos, `edit` y después `dtf`.
-6. Sigue `review`. Si falla, corrige y vuelve a `review`. No exportes un review fallido.
-7. Sigue `export`.
-8. Resume herramientas, ruta exportada e id de `checkpoint`.
+1. Escribe un plan de una línea: archivo, etapas, salida. Elige skills por lo que pide el usuario, no por el nombre del archivo.
+   - Abrir o crear: `open`.
+   - Horizonte, recorte, perspectiva, colocar un logo: `composicion`.
+   - Exposición, curvas, dominante, saturación, blanco y negro: `color`.
+   - Granos, ojeras, dientes, ojos, suavizar piel: `piel`.
+   - Fondo, máscara, pelo, halo: `seleccion`.
+   - Ruido, nitidez, claridad: `nitidez`. Ruido antes que nitidez.
+   - Pintura, texto, una capa suelta: `edit`.
+   - Camiseta, película, gang, underbase: `dtf`.
+2. `checkpoint` con una etiqueta del brief antes del primer píxel. `undo` no revierte.
+3. Ejecuta las etapas en ese orden. Cada una verifica con `get_bitmap` antes de pasar a la siguiente.
+4. Sigue `review`. Si falla, vuelve a la etapa y repite `review`.
+5. Sigue `export`.
 
-No saltes el paso 6 ni el 7.
+No saltes el paso 4 ni el 5, aunque el usuario solo haya nombrado el retoque. Si pide no exportar, dilo en el resumen y deja el archivo sin entregar, pero el `review` se hace igual.
 
 ## Verificaciones
 
-Antes de `delete_layer`, `flatten`, `merge_down`, `knockout_background`, `cutout_color`, `clean_for_dtf` o exportar: `checkpoint`. `undo` y `redo` en GIMP 3 devuelven `supported: false` y no revierten.
+`checkpoint` antes de filtros, knockout, borrado o export. `gimp_exec` solo con un fragmento de `rules/gimp-exec-snippets.md`, y solo si `gimp_exec` está registrado. Si falta, `GIMP_MCP_NO_EXEC` lo apagó: no inventes otro camino.
 
-`gimp_exec` solo si ninguna herramienta estructurada cubre el caso. Ver `rules/seguridad.md`.
+## Errores comunes
+
+Saltarse `review` porque el ajuste “se ve bien” en el número. Entregar sin reabrir el archivo exportado. Usar `SOFT_LIGHT` en vez de `SOFTLIGHT`.
 
 ## Oficio
 
 - `rules/seguridad.md`
 - `rules/capas.md`
-- `rules/color.md`
-- `rules/dtf.md`
-- `rules/exportacion.md`
-
-Si esta skill está instalada en el workspace, las mismas reglas están en `references/` junto a `studio`. El cliente MCP ya describe los parámetros; aquí va el orden y el criterio.
+- `rules/gimp-exec-snippets.md`
+- La skill de cada etapa, y su archivo en `rules/`.

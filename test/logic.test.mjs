@@ -18,10 +18,30 @@ test("el catálogo nombra las 119 herramientas del MCP", () => {
 test("slash commands de @gimp eligen skill", () => {
   assert.equal(logic.skillForCommand(undefined), "studio");
   assert.equal(logic.skillForCommand("editar"), "edit");
+  assert.equal(logic.skillForCommand("color"), "color");
+  assert.equal(logic.skillForCommand("piel"), "piel");
+  assert.equal(logic.skillForCommand("seleccion"), "seleccion");
+  assert.equal(logic.skillForCommand("nitidez"), "nitidez");
+  assert.equal(logic.skillForCommand("composicion"), "composicion");
   assert.equal(logic.skillForCommand("dtf"), "dtf");
   assert.equal(logic.skillForCommand("revisar"), "review");
   assert.equal(logic.skillForCommand("exportar"), "export");
   assert.equal(logic.skillForCommand("doctor"), "doctor");
+});
+
+test("un brief en lenguaje natural cierra con review y export", () => {
+  const piel = logic.routeBrief("suaviza la piel y quita un grano");
+  assert.ok(piel.includes("piel"));
+  assert.deepEqual(piel.slice(-2), ["review", "export"]);
+  const dtf = logic.routeBrief("prepara el logo para una camiseta");
+  assert.ok(dtf.includes("dtf"));
+  assert.deepEqual(dtf.slice(-2), ["review", "export"]);
+  const n = logic.routeBrief("hazla más nítida");
+  assert.ok(n.includes("nitidez"));
+  assert.equal(logic.skillsForTurn(undefined, "suaviza la piel")[0], "studio");
+  assert.ok(logic.skillsForTurn(undefined, "suaviza la piel").includes("piel"));
+  assert.deepEqual(logic.skillsForTurn("editar", "también el color"), ["edit"]);
+  assert.deepEqual(logic.skillsForTurn("doctor", "x"), ["doctor"]);
 });
 
 test("filtra herramientas del MCP gimp y no otras", () => {
@@ -114,7 +134,7 @@ test("detecta el IDE por appName y las APIs por tipo", () => {
   assert.deepEqual(caps, { chat: true, mcpProvider: false, lm: true });
 });
 
-test("el plan de Antigravity escribe workflow, skill /gimp, rule y fusiona el MCP", () => {
+test("el plan de Antigravity escribe skills /gimp y plugin, no workflows ni el mcp del usuario", () => {
   const skills = Object.fromEntries(logic.BUNDLED_SKILLS.map((name) => [
     name,
     `---\nname: ${name}\ndescription: d\n---\n\n# ${name}\n`,
@@ -127,42 +147,135 @@ test("el plan de Antigravity escribe workflow, skill /gimp, rule y fusiona el MC
     rules: { "seguridad.md": "# s\n" },
   });
   const paths = files.map((f) => f.path);
-  assert.ok(paths.includes(".agents/workflows/gimp.md"));
+  assert.equal(paths.includes(".agents/workflows/gimp.md"), false);
+  assert.equal(paths.includes(".agents/mcp_config.json"), false);
   assert.ok(paths.includes(".agents/skills/gimp/SKILL.md"));
   assert.ok(paths.includes(".agents/rules/gimp-studio.md"));
-  assert.ok(paths.includes(".agents/mcp_config.json"));
   assert.ok(paths.includes(".agents/skills/studio/references/seguridad.md"));
+  assert.ok(paths.includes(".agents/plugins/gimp-studio/plugin.json"));
+  assert.ok(paths.includes(".agents/plugins/gimp-studio/skills/gimp/SKILL.md"));
+  assert.ok(paths.includes(".agents/plugins/gimp-studio/mcp_config.json"));
   assert.equal(paths.some((p) => p.startsWith(".cursor/")), false);
-  const rule = files.find((f) => f.path.endsWith("gimp-studio.md")).contents;
+  const rule = files.find((f) => f.path === ".agents/rules/gimp-studio.md").contents;
   assert.match(rule, /trigger: model_decision/);
-  const mcp = JSON.parse(files.find((f) => f.path.endsWith("mcp_config.json")).contents);
-  assert.equal(mcp.mcpServers.otro.command, "x");
+  const plugin = JSON.parse(files.find((f) => f.path.endsWith("plugin.json")).contents);
+  assert.equal(plugin.name, "gimp-studio");
+  const mcp = JSON.parse(files.find((f) => f.path.endsWith("plugins/gimp-studio/mcp_config.json")).contents);
+  assert.deepEqual(Object.keys(mcp.mcpServers), ["gimp"]);
   assert.equal(mcp.mcpServers.gimp.command, "gimp-mcp");
-  const gimpSkill = files.find((f) => f.path.endsWith("skills/gimp/SKILL.md")).contents;
+  assert.equal(mcp.mcpServers.otro, undefined);
+  const gimpSkill = files.find((f) => f.path === ".agents/skills/gimp/SKILL.md").contents;
   assert.match(gimpSkill, /^name: gimp$/m);
+});
+
+test("la fusión confirmada conserva servidores y deja copia si el archivo existe", () => {
+  const raw = JSON.stringify({
+    extra: true,
+    mcpServers: {
+      other: { command: "echo", args: ["hi"] },
+      gimp: { command: "old", args: ["x"], env: { A: "1" } },
+    },
+  });
+  const plan = logic.planConfirmedMcpWrite({
+    configPath: "/tmp/mcp_config.json",
+    raw,
+    exists: true,
+    shape: "mcpServers",
+    stamp: "20261010T000000",
+  });
+  const out = JSON.parse(plan.next);
+  assert.equal(out.extra, true);
+  assert.equal(out.mcpServers.other.command, "echo");
+  assert.equal(out.mcpServers.gimp.command, "gimp-mcp");
+  assert.deepEqual(out.mcpServers.gimp.args, ["serve"]);
+  assert.equal(out.mcpServers.gimp.env.A, "1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.backupPath, "/tmp/mcp_config.json.bak-20261010T000000");
+  assert.match(plan.summary, /other/);
+  assert.match(plan.summary, /Hay que escribir/);
+});
+
+test("si gimp ya está bien no escribe, y sin archivo no hay copia", () => {
+  const raw = JSON.stringify({ mcpServers: { gimp: { command: "gimp-mcp", args: ["serve"] } } });
+  const plan = logic.planConfirmedMcpWrite({
+    configPath: "/tmp/a.json",
+    raw,
+    exists: false,
+    shape: "mcpServers",
+    stamp: "s",
+  });
+  assert.equal(plan.changed, false);
+  assert.equal(plan.backupPath, null);
+  assert.match(plan.summary, /No hace falta escribir/);
+  assert.match(plan.summary, /no hay copia/);
+});
+
+test("en VS Code la entrada gimp no está lista hasta tener type stdio", () => {
+  const raw = JSON.stringify({ servers: { gimp: { command: "gimp-mcp", args: ["serve"] } } });
+  const plan = logic.planConfirmedMcpWrite({
+    configPath: "/tmp/v.json",
+    raw,
+    exists: true,
+    shape: "vscode",
+    stamp: "s",
+  });
+  assert.equal(plan.changed, true);
+  assert.equal(plan.backupPath, "/tmp/v.json.bak-s");
+  const out = JSON.parse(plan.next);
+  assert.equal(out.servers.gimp.type, "stdio");
+  const ready = logic.planConfirmedMcpWrite({
+    configPath: "/tmp/v.json",
+    raw: plan.next,
+    exists: true,
+    shape: "vscode",
+    stamp: "s2",
+  });
+  assert.equal(ready.changed, false);
+});
+
+test("un JSON que no es objeto no se planifica para fusionar", () => {
+  assert.throws(() => logic.planConfirmedMcpWrite({
+    configPath: "/tmp/x",
+    raw: "[1]",
+    exists: true,
+    shape: "mcpServers",
+    stamp: "s",
+  }), /objeto JSON/);
+  assert.throws(() => logic.planConfirmedMcpWrite({
+    configPath: "/tmp/x",
+    raw: "{",
+    exists: true,
+    shape: "mcpServers",
+    stamp: "s",
+  }), SyntaxError);
 });
 
 test("las skills cumplen el contrato y citan herramientas reales", () => {
   const root = path.join(import.meta.dirname, "..");
-  const names = ["studio", "open", "edit", "dtf", "review", "export"];
+  const names = [...logic.BUNDLED_SKILLS];
   const mentioned = new Set();
   for (const name of names) {
     const text = fs.readFileSync(path.join(root, "skills", name, "SKILL.md"), "utf8");
-    for (const heading of ["Cuándo usar", "Pasos", "Verificaciones", "Oficio"]) {
+    for (const heading of ["Cuándo usar", "Diagnóstico", "Pasos", "Verificaciones", "Errores comunes", "Oficio"]) {
       assert.ok(text.includes(heading), `${name} sin ${heading}`);
     }
     assert.match(text, /MCP `gimp`|servidor MCP `gimp`/);
     for (const hit of text.matchAll(/`([a-z][a-z0-9_]*)`/g)) mentioned.add(hit[1]);
   }
   const studio = fs.readFileSync(path.join(root, "skills/studio/SKILL.md"), "utf8");
-  assert.match(studio, /No saltes el paso 6 ni el 7/);
-  for (const tool of ["status", "open_image", "checkpoint", "get_bitmap", "gimp_exec", "knockout_background", "export_dtf_png", "export_image"]) {
+  assert.match(studio, /No saltes el paso 4 ni el 5/);
+  for (const tool of ["status", "open_image", "checkpoint", "get_bitmap", "gimp_exec", "knockout_background", "export_dtf_png", "export_image", "apply_filter", "set_blend_mode"]) {
     assert.ok(mentioned.has(tool), tool);
     assert.ok(logic.GIMP_TOOL_NAMES.includes(tool));
   }
   for (const invented of ["gimp_open", "open_document", "save_image", "run_python"]) {
     assert.equal(mentioned.has(invented), false);
   }
+  const snippets = fs.readFileSync(path.join(root, "rules/gimp-exec-snippets.md"), "utf8");
+  for (const fragment of ["crop", "straighten", "scale", "canvas", "perspective", "rotate90", "flip", "jpeg", "new_from_visible", "heal", "newsprint"]) {
+    assert.match(snippets, new RegExp(`^## ${fragment}$`, "m"));
+  }
+  assert.match(snippets, /GIMP_MCP_NO_EXEC/);
   const skills = Object.fromEntries(names.map((name) => [
     name,
     fs.readFileSync(path.join(root, "skills", name, "SKILL.md"), "utf8"),
@@ -173,8 +286,8 @@ test("las skills cumplen el contrato y citan herramientas reales", () => {
     mcpRaw: "",
     writeMcp: false,
   });
-  const workflow = planned.find((f) => f.path === ".agents/workflows/gimp.md").contents;
-  assert.ok(workflow.length < 12000, "el workflow pasa el límite de 12000 caracteres de Antigravity");
+  assert.equal(planned.some((f) => f.path === ".agents/workflows/gimp.md"), false);
+  assert.ok(planned.some((f) => f.path === ".agents/skills/gimp/SKILL.md"));
 });
 
 test("el plan de Cursor no toca rutas de Antigravity", () => {

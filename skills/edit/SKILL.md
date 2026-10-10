@@ -1,6 +1,6 @@
 ---
 name: edit
-description: Edición cotidiana en GIMP (selección, pintura, texto, color, filtros y capas) con herramientas estructuradas del MCP gimp.
+description: Pintura, texto y capas sueltas. El color, la piel, la máscara, la nitidez y el recorte tienen su propia skill.
 ---
 
 # edit
@@ -9,30 +9,33 @@ Requiere el servidor MCP `gimp` (`gimp-mcp serve`).
 
 ## Cuándo usar
 
-Pintura, selección, texto, tono, color y filtros de un encargo que no es solo producción DTF. La orquesta es `studio`: esta skill no sustituye a `review` ni a `export`.
+“Añade un texto”, “pinta esto”, “sube la opacidad”, “duplica la capa”, “una sombra bajo el logo”. Si el pedido es de tono, piel, recorte, ruido o DTF, cambia a esa skill. Esta no cierra el flujo: `studio` sigue con `review` y `export`.
+
+## Diagnóstico
+
+`get_metadata` y `get_bitmap`. `checkpoint` antes del primer cambio.
 
 ## Pasos
 
-1. `checkpoint` antes del primer cambio.
-2. Inspecciona con `get_metadata` y, si el cambio es de tono, `histogram` (`channel` = `value`, `space` = `perceptual`).
-3. Elige herramientas estructuradas, en este orden de preferencia:
-   - Selección: `select_rect`, `select_ellipse`, `select_by_color`, `fuzzy_select`, `foreground_select`, `select_from_alpha`, `select_feather`, `select_grow`, `select_shrink`, `select_none`.
-   - Capas: `create_layer`, `duplicate_layer`, `set_opacity`, `set_blend_mode`, `set_visible`, `move_layer`, `rename_layer`. `delete_layer`, `merge_down` y `flatten` solo tras otro `checkpoint`.
-   - Pintura: `set_fg`, `set_bg`, `set_brush`, `set_paint_opacity`, `fill`, `bucket_fill`, `pencil`, `paintbrush`, `stroke_selection`, `gradient`.
-   - Texto: `check_fonts` y después `create_text_layer`. Ajustes con `set_text_props`. Contorno con `outline_text` (añade una capa).
-   - Tono y color: `brightness_contrast`, `levels`, `curves`, `hue_saturation`, `color_balance`, `desaturate`, `normalize`, `posterize`, `threshold`, `invert`.
-   - Filtros: `gaussian_blur`, `unsharp_mask`, `drop_shadow`. `apply_filter` solo para un op GEGL que no tenga herramienta propia; antes `describe_op` o `list_gegl_ops`.
-   - Alfa suave o recorte de un color plano: `add_alpha`, `color_to_alpha` (suave) o `cutout_color` (duro). Un knockout de prenda es la skill `dtf` (`knockout_background`), no esta.
-4. Tras el cambio, `get_bitmap` de la imagen activa. Si no cuadra, `restore` del checkpoint y reintenta.
+1. Capa nueva: `create_layer` (posición 0 = arriba) o `duplicate_layer` si vas a pintar encima de algo que quieres conservar.
+2. Color de pintura: `set_fg` / `set_bg`. Brocha: `set_brush`. Opacidad del trazo: `set_paint_opacity` (piel y volumen van al 5–15, no al 100).
+3. Relleno: `fill` (`foreground`, `background` o `transparent`) o `bucket_fill`. Trazos: `pencil` o `paintbrush`. Contorno de una selección: `stroke_selection`. Degradado: `gradient`.
+4. Texto: `check_fonts` y luego `create_text_layer`. Ajustes con `set_text_props`. Contorno con `outline_text` (crea otra capa).
+5. Orden y visibilidad: `reorder_layer`, `set_opacity` (0–100), `set_visible`, `rename_layer`. Modo de capa: `set_blend_mode` con un nombre de `rules/capas.md` (`SOFTLIGHT`, no `SOFT_LIGHT`). Si el resultado no cambia, el nombre era inválido y quedó en `NORMAL`.
+6. Sombra de un logo: `drop_shadow`. Agranda la capa; compruébalo con `get_metadata`.
+7. `delete_layer`, `merge_down` y `flatten` solo tras otro `checkpoint`.
+
+Tras cada paso, `get_bitmap`.
 
 ## Verificaciones
 
-`levels` y `curves` hablan en 0.0–1.0 lineal, no en el 0–255 sRGB de `color_at`. `threshold` sí usa la escala 0–1 de `color_at` / 255. Ver `rules/color.md`.
+No uses esta skill para `levels`, `curves`, `gaussian_blur` ni `unsharp_mask`: son de `color` y `nitidez`, y son destructivos.
 
-No uses `gimp_exec` para estas tareas. Ver `rules/seguridad.md` y `rules/capas.md`.
+## Errores comunes
+
+Aplanar para “ver el resultado”. Un modo de capa que vuelve a Normal en silencio. Pintar al 100 % un dodge que debía ser un velo.
 
 ## Oficio
 
-- `rules/color.md`
 - `rules/capas.md`
 - `rules/seguridad.md`

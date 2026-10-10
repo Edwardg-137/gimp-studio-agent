@@ -12,7 +12,7 @@ Si `vscode.env.appName` contiene `Cursor`, **GIMP Studio: Instalar agente en el 
 
 - `.cursor/mcp.json` — entrada `gimp` con `command` `gimp-mcp` y `args` `["serve"]`. Otras entradas se conservan. Si `gimp` ya tenía `env`, se mantiene.
 - `.cursor/skills/gimp/SKILL.md` — comando `/gimp` (mismo cuerpo que `studio`).
-- `.cursor/skills/{studio,open,edit,dtf,review,export}/SKILL.md`
+- `.cursor/skills/{studio,open,edit,color,piel,seleccion,nitidez,composicion,dtf,review,export}/SKILL.md`
 - `.cursor/skills/studio/references/` — copia de `rules/`
 - `.cursor/rules/gimp-studio.mdc` — `alwaysApply: false` y una descripción para que el agente la tome cuando el pedido es de imagen.
 
