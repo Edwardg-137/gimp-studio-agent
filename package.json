@@ -2,7 +2,7 @@
   "name": "gimp-studio-agent",
   "displayName": "GIMP Studio Agent",
   "description": "Capa de agente para editar en GIMP 3.x sobre el MCP gimp-studio-mcp. Participante @gimp, skills y doctor.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "twelvetake",
   "license": "MIT",
   "repository": {
@@ -32,7 +32,27 @@
         "commands": [
           {
             "name": "editar",
-            "description": "Edición cotidiana: pintura, selección, texto, color y filtros."
+            "description": "Edición cotidiana: pintura, texto y capas."
+          },
+          {
+            "name": "color",
+            "description": "Color y tono: exposición, curvas, dominantes, saturación."
+          },
+          {
+            "name": "piel",
+            "description": "Retoque de piel y retrato."
+          },
+          {
+            "name": "seleccion",
+            "description": "Selecciones, máscaras y recorte de fondo."
+          },
+          {
+            "name": "nitidez",
+            "description": "Ruido primero, nitidez después."
+          },
+          {
+            "name": "composicion",
+            "description": "Recorte, horizonte, perspectiva y montaje."
           },
           {
             "name": "dtf",

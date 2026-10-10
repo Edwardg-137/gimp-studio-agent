@@ -2,12 +2,12 @@
  * Lógica sin vscode: fusión MCP, lectura de `gimp-mcp doctor`, skills y rutas.
  *
  * Rutas de Antigravity confirmadas en la documentación oficial (no inventadas):
- * - Workflows de workspace: `.agents/workflows/<nombre>.md`
+ * - No escribimos `.agents/workflows/`: dejan de ejecutarse el 2026-10-19.
  *   Fuente: https://antigravity.google/docs/migration/workflows-to-skills/
- *   (la página https://antigravity.google/docs/ide/workflows/ no nombra el directorio).
- *   Esos workflows dejan de ejecutarse el 2026-10-19.
  * - Skills de workspace: `.agents/skills/<nombre>/SKILL.md`, comando `/<nombre>`.
- *   Misma guía de migración. Si coexisten, la skill gana al workflow.
+ *   https://antigravity.google/docs/skills/ y la guía de migración.
+ * - Plugin de workspace: `.agents/plugins/<nombre>/` con `plugin.json`.
+ *   https://antigravity.google/docs/plugins/
  * - Rules de workspace: `.agents/rules/*.md` con frontmatter `trigger`
  *   (`always_on` | `model_decision` | `glob` | `manual`).
  *   Fuente: https://antigravity.google/docs/rules/
@@ -61,13 +61,52 @@ export const GIMP_TOOL_NAMES: readonly string[] = [
 
 const TOOL_SET = new Set(GIMP_TOOL_NAMES);
 
-export const BUNDLED_SKILLS = ["studio", "open", "edit", "dtf", "review", "export"] as const;
+export const BUNDLED_SKILLS = [
+  "studio", "open", "edit", "color", "piel", "seleccion", "nitidez", "composicion",
+  "dtf", "review", "export",
+] as const;
+
+/** Orden fijo: lo que el brief nombra, y al final review y export. */
+const BRIEF_ROUTES: { skill: string; pattern: RegExp }[] = [
+  { skill: "open", pattern: /\b(abre|abrir|lienzo|nueva imagen)\b/i },
+  { skill: "composicion", pattern: /horizont|perspectiv|instagram|tercios|enderez|voltea|g[ií]rala|recort/i },
+  { skill: "color", pattern: /contraste|satur|exposici|amarill|azulad|blanco y negro|curvas|niveles|balance de blancos|\btono\b/i },
+  { skill: "piel", pattern: /piel|granos|ojera|dientes|ojos rojos|retoque|suaviza/i },
+  { skill: "seleccion", pattern: /m[aá]scara|selecci|quita el fondo|pelo|halo|transparen/i },
+  { skill: "nitidez", pattern: /n[ií]tid|ruido|desenfo|enfoc|claridad/i },
+  { skill: "dtf", pattern: /\bdtf\b|camiseta|underbase|gang|pel[ií]cula|transfer/i },
+  { skill: "edit", pattern: /\btexto\b|pincel|dibuja/i },
+];
+
+/** Skills de etapa para un brief en lenguaje natural. Siempre cierra con review y export. */
+export function routeBrief(prompt: string): string[] {
+  const found: string[] = [];
+  for (const route of BRIEF_ROUTES) {
+    if (route.pattern.test(prompt)) found.push(route.skill);
+  }
+  for (const tail of ["review", "export"]) {
+    if (!found.includes(tail)) found.push(tail);
+  }
+  return found;
+}
+
+/** Qué skills inyectar en un turno. Un subcomando carga solo esa skill; sin él, studio enruta. */
+export function skillsForTurn(command: string | undefined, prompt: string): string[] {
+  if (command === "doctor") return ["doctor"];
+  if (command) return [skillForCommand(command)];
+  return ["studio", ...routeBrief(prompt)];
+}
 
 export const GIMP_MCP_ENTRY = { command: "gimp-mcp", args: ["serve"] as const };
 
 export function skillForCommand(command: string | undefined): string {
   switch (command) {
     case "editar": return "edit";
+    case "color": return "color";
+    case "piel": return "piel";
+    case "seleccion": return "seleccion";
+    case "nitidez": return "nitidez";
+    case "composicion": return "composicion";
     case "dtf": return "dtf";
     case "revisar": return "review";
     case "exportar": return "export";
@@ -242,23 +281,9 @@ export function planWorkspaceInstall(input: {
     ),
   });
   if (input.ide === "antigravity") {
-    const steps = studio.replace(/^---\n[\s\S]*?\n---\n*/, "");
-    files.push({
-      path: ".agents/workflows/gimp.md",
-      contents: [
-        "---",
-        "name: gimp",
-        "description: Entrada /gimp. Flujo studio sobre el MCP gimp (gimp-mcp serve). No salta review ni export.",
-        "---",
-        "",
-        steps.trim(),
-        "",
-      ].join("\n"),
-    });
     files.push({ path: ".agents/rules/gimp-studio.md", contents: antigravityRule() });
-    if (input.writeMcp) {
-      files.push({ path: ".agents/mcp_config.json", contents: mergeMcpConfig(input.mcpRaw, "mcpServers") });
-    }
+    files.push(...antigravityPlugin(input.skills, input.rules ?? {}));
+    // El mcp_config.json del usuario no se escribe aquí: hace falta copia y confirmación.
   } else {
     files.push({ path: ".cursor/rules/gimp-studio.mdc", contents: cursorRule() });
     if (input.writeMcp) {
@@ -278,12 +303,104 @@ function antigravityRule(): string {
     "# GIMP Studio",
     "",
     "- Servidor MCP `gimp`: comando `gimp-mcp`, argumentos `serve`. No reimplementes sus herramientas.",
-    "- Prefiere herramientas estructuradas. `gimp_exec` solo como escape, y dilo antes.",
+    "- Prefiere herramientas estructuradas. `gimp_exec` solo con un fragmento de `rules/gimp-exec-snippets.md`. Si no está registrado, `GIMP_MCP_NO_EXEC` lo apagó.",
     "- Antes de borrar, aplanar, knockout o exportar: `checkpoint`. `undo` no revierte en GIMP 3.",
-    "- Un brief completo sigue la skill `studio`: plan, MCP, `review` (`get_bitmap`) y `export`.",
-    "- Detalle en `.agents/skills/` (studio, open, edit, dtf, review, export).",
+    "- Un brief completo sigue la skill `studio`: plan, MCP, `review` (`get_bitmap`) y `export`. No saltes ninguna de las dos.",
+    "- Entrada `/gimp`. Skills en `.agents/skills/`. No uses workflows: dejan de funcionar el 2026-10-19.",
     "",
   ].join("\n");
+}
+
+const PLUGIN_MCP = `{
+  "mcpServers": {
+    "gimp": {
+      "command": "gimp-mcp",
+      "args": ["serve"]
+    }
+  }
+}
+`;
+
+function antigravityPlugin(skills: Record<string, string>, rules: Record<string, string>): PlannedFile[] {
+  const root = ".agents/plugins/gimp-studio";
+  const files: PlannedFile[] = [
+    {
+      path: `${root}/plugin.json`,
+      contents: JSON.stringify({
+        $schema: "https://antigravity.google/schemas/v1/plugin.json",
+        name: "gimp-studio",
+        description: "Skills de edición en GIMP y el servidor MCP gimp (gimp-mcp serve).",
+      }, null, 2) + "\n",
+    },
+    { path: `${root}/mcp_config.json`, contents: PLUGIN_MCP },
+    { path: `${root}/rules/gimp-studio.md`, contents: antigravityRule() },
+  ];
+  for (const name of BUNDLED_SKILLS) {
+    files.push({
+      path: `${root}/skills/${name}/SKILL.md`,
+      contents: withSkillName(skills[name], name),
+    });
+  }
+  files.push({
+    path: `${root}/skills/gimp/SKILL.md`,
+    contents: withSkillName(skills.studio, "gimp").replace(
+      /^description:.*$/m,
+      "description: Entrada /gimp del agente GIMP Studio. Sigue el flujo studio (abrir, editar o DTF, revisar, exportar) con el MCP gimp.",
+    ),
+  });
+  for (const [name, body] of Object.entries(rules)) {
+    files.push({ path: `${root}/skills/studio/references/${name}`, contents: body });
+  }
+  return files;
+}
+
+export interface McpWritePlan {
+  backupPath: string | null;
+  next: string;
+  changed: boolean;
+  summary: string;
+}
+
+/** Diff de una fusión MCP. No escribe nada: el llamador confirma y luego copia. */
+export function planConfirmedMcpWrite(input: {
+  configPath: string;
+  raw: string;
+  exists: boolean;
+  shape: McpShape;
+  stamp: string;
+}): McpWritePlan {
+  const next = mergeMcpConfig(input.raw, input.shape);
+  const key = input.shape === "vscode" ? "servers" : "mcpServers";
+  let previous: Record<string, unknown> = {};
+  if (input.raw.trim()) {
+    const parsed: unknown = JSON.parse(input.raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("La config MCP no es un objeto JSON.");
+    }
+    previous = record((parsed as Record<string, unknown>)[key]);
+  }
+  const after = JSON.parse(next) as Record<string, unknown>;
+  const nextServers = record(after[key]);
+  const others = Object.keys(previous).filter((name) => name !== "gimp");
+  const gimp = record(nextServers.gimp);
+  const already = gimpReady(record(previous.gimp), input.shape);
+  const changed = !already;
+  const backupPath = input.exists ? `${input.configPath}.bak-${input.stamp}` : null;
+  const kept = others.length ? `Se conservan: ${others.join(", ")}.` : "No hay otros servidores.";
+  const summary = [
+    kept,
+    `gimp queda en command ${String(gimp.command)} args ${JSON.stringify(gimp.args)}.`,
+    backupPath ? `Copia previa: ${backupPath}.` : "El archivo no existe: no hay copia.",
+    changed ? "Hay que escribir." : "La entrada gimp ya era esa. No hace falta escribir.",
+  ].join(" ");
+  return { backupPath, next, changed, summary };
+}
+
+function gimpReady(entry: Record<string, unknown>, shape: McpShape): boolean {
+  if (entry.command !== "gimp-mcp") return false;
+  if (JSON.stringify(entry.args) !== JSON.stringify(["serve"])) return false;
+  if (shape === "vscode" && entry.type !== "stdio") return false;
+  return true;
 }
 
 function cursorRule(): string {
@@ -296,7 +413,7 @@ function cursorRule(): string {
     "# GIMP Studio",
     "",
     "- Servidor MCP `gimp`: comando `gimp-mcp`, argumentos `serve`.",
-    "- Prefiere herramientas estructuradas. `gimp_exec` solo como escape documentado.",
+    "- Prefiere herramientas estructuradas. `gimp_exec` solo con un fragmento de `rules/gimp-exec-snippets.md`.",
     "- Antes de operaciones destructivas: `checkpoint`. No uses `undo` para revertir.",
     "- Sigue `.cursor/skills/studio/SKILL.md`. No saltes review ni export.",
     "",

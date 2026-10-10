@@ -2,16 +2,18 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
 import * as vscode from "vscode";
+import * as os from "node:os";
 import {
   BUNDLED_SKILLS,
   buildInstructions,
   detectIde,
   hostCapabilities,
   isGimpMcpTool,
+  planConfirmedMcpWrite,
   planWorkspaceInstall,
   readDoctor,
   shellInstall,
-  skillForCommand,
+  skillsForTurn,
   type IdeKind,
 } from "./logic";
 
@@ -76,14 +78,14 @@ async function handleChat(
   token: vscode.CancellationToken,
 ): Promise<vscode.ChatResult | void> {
   try {
-    if (skillForCommand(request.command) === "doctor") {
+    const names = skillsForTurn(request.command, request.prompt);
+    if (names[0] === "doctor") {
       const report = await collectDoctor();
       stream.markdown(report.markdown);
       await offerInstall(report);
       return;
     }
-    const skillName = skillForCommand(request.command);
-    const body = readBundledSkill(context, skillName);
+    const body = names.map((name) => readBundledSkill(context, name)).join("\n\n");
     if (!request.model || typeof request.model.sendRequest !== "function") {
       stream.markdown("Este chat no trae un modelo de lenguaje. Ejecuta **GIMP Studio: Instalar agente en el workspace** e invoca `/gimp` en la caja de agente del IDE.");
       return;
@@ -314,12 +316,16 @@ async function installAgent(context: vscode.ExtensionContext, mcpApi: boolean): 
   const skills: Record<string, string> = {};
   for (const name of BUNDLED_SKILLS) skills[name] = readBundledSkill(context, name);
   const rules = readBundledRules(context);
-  const mcpPath = mcpRelative(ide);
-  const abs = path.join(folder.uri.fsPath, mcpPath);
-  const mcpRaw = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+  const mcpRaw = ide === "antigravity" ? "" : readIfExists(path.join(folder.uri.fsPath, mcpRelative(ide)));
   let planned;
   try {
-    planned = planWorkspaceInstall({ ide, skills, mcpRaw, writeMcp: true, rules });
+    planned = planWorkspaceInstall({
+      ide,
+      skills,
+      mcpRaw,
+      writeMcp: ide !== "antigravity",
+      rules,
+    });
   } catch (err) {
     vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
     return;
@@ -329,8 +335,56 @@ async function installAgent(context: vscode.ExtensionContext, mcpApi: boolean): 
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, file.contents);
   }
+  if (ide === "antigravity") await confirmAntigravityMcp(folder.uri.fsPath);
   const how = ide === "antigravity" || ide === "cursor" ? " Invócalo con /gimp en la caja de agente." : "";
   vscode.window.showInformationMessage(`GIMP Studio escribió ${planned.length} archivos en el workspace.${how}`);
+}
+
+function readIfExists(file: string): string {
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+}
+
+async function confirmAntigravityMcp(workspaceFs: string): Promise<void> {
+  const pick = await vscode.window.showQuickPick(
+    [
+      { label: "Workspace", description: ".agents/mcp_config.json", target: "workspace" as const },
+      { label: "Global", description: "~/.gemini/config/mcp_config.json", target: "global" as const },
+      { label: "No fusionar", description: "El plugin ya declara el servidor gimp", target: "skip" as const },
+    ],
+    { placeHolder: "Antigravity no tiene API de MCP. ¿Fusionar gimp en un mcp_config.json?" },
+  );
+  if (!pick || pick.target === "skip") return;
+  const configPath = pick.target === "global"
+    ? path.join(os.homedir(), ".gemini", "config", "mcp_config.json")
+    : path.join(workspaceFs, ".agents", "mcp_config.json");
+  const exists = fs.existsSync(configPath);
+  const raw = exists ? fs.readFileSync(configPath, "utf8") : "";
+  let plan;
+  try {
+    plan = planConfirmedMcpWrite({
+      configPath,
+      raw,
+      exists,
+      shape: "mcpServers",
+      stamp: new Date().toISOString().replace(/[:.]/g, ""),
+    });
+  } catch (err) {
+    vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
+    return;
+  }
+  if (!plan.changed) {
+    vscode.window.showInformationMessage("La entrada gimp ya está en ese archivo. No se ha modificado.");
+    return;
+  }
+  const choice = await vscode.window.showWarningMessage(
+    `¿Fusionar el servidor gimp en ${configPath}?`,
+    { modal: true, detail: plan.summary },
+    "Fusionar",
+  );
+  if (choice !== "Fusionar") return;
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  if (plan.backupPath && exists) fs.copyFileSync(configPath, plan.backupPath);
+  fs.writeFileSync(configPath, plan.next);
 }
 
 function mcpRelative(ide: IdeKind): string {
