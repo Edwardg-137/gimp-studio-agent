@@ -2,6 +2,8 @@
 
 Basadas en [Ponytail](https://github.com/DietrichGebert/ponytail) (licencia MIT). Aplican a todo cambio de código de este repositorio.
 
+Commit messages: short English description in Conventional Commits format (feat/fix/docs/chore/ci/test/refactor), describing the change, never an instruction.
+
 # Ponytail
 
 Lazy-senior-dev ruleset for code. Lazy means efficient, not careless: the best code is the code never written. Based on the MIT-licensed [ponytail](https://github.com/DietrichGebert/ponytail) project.
