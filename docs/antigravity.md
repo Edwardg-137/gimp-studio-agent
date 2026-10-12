@@ -40,6 +40,8 @@ Si eliges fusionar, calcula el resultado, lo enseña en un aviso modal y **esper
 
 `/gimp` puede quedar dos veces: en `.agents/skills/gimp` y dentro del plugin. Las dos copias dicen lo mismo. Si el panel se lia, quédate con una.
 
+El `.vsix` se descarga en [install.md, sección 0](install.md#0-instalar-la-extensión-vsix).
+
 ## Probar
 
 1. [install.md](install.md): `pipx install twelvetake-gimp-studio-mcp` (o `pip install --user`), `gimp-mcp install-plugin`, reinicia GIMP, `gimp-mcp doctor`.
