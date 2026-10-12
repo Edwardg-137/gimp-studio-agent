@@ -18,6 +18,8 @@ Si `vscode.env.appName` contiene `Cursor`, **GIMP Studio: Instalar agente en el 
 
 `vscode.chat` en Cursor puede no existir. La extensión lo comprueba y no falla al activarse. El camino previsto es `/gimp` en la caja de agente, con el MCP `gimp` ya fusionado.
 
+El `.vsix` se descarga en [install.md, sección 0](install.md#0-instalar-la-extensión-vsix).
+
 ## Probar
 
 1. Completa [install.md](install.md) y `gimp-mcp doctor`.

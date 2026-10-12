@@ -4,7 +4,7 @@ Capa de agente, versión 0.2, encima de [gimp-studio-mcp](https://github.com/Twe
 
 Es una extensión de VS Code (y de forks que carguen extensiones). En VS Code el agente es el participante `@gimp`. En Antigravity y Cursor, la orden **GIMP Studio: Instalar agente en el workspace** deja las skills para invocarlas con `/gimp`.
 
-El diseño está en [CONTEXTO.md](CONTEXTO.md). Instalación del MCP: [docs/install.md](docs/install.md).
+El diseño está en [CONTEXTO.md](CONTEXTO.md). Instalación del MCP: [docs/install.md](docs/install.md). El `.vsix`: [sección 0](docs/install.md#0-instalar-la-extensión-vsix).
 
 | Cliente | Guía |
 | --- | --- |

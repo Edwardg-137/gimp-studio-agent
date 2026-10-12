@@ -10,6 +10,8 @@ El `engines.vscode` es `^1.101.0`, la versión en la que entra `vscode.lm.regist
 4. El participante manda la skill como instrucciones a `vscode.lm` (`request.model.sendRequest`) y le pasa las herramientas del MCP cuyo nombre es el de gimp-studio-mcp o un nombre del host que contiene `gimp` y termina en esa herramienta.
 5. **GIMP Studio: Doctor** y la activación ejecutan `gimp-mcp doctor`. Si falta el binario, la notificación tiene el botón **Instalar**.
 
+El `.vsix` se descarga en [install.md, sección 0](install.md#0-instalar-la-extensión-vsix).
+
 ## Probar
 
 1. Instala el MCP como en [install.md](install.md) y reinicia GIMP.

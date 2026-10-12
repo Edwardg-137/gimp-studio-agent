@@ -1,6 +1,26 @@
 # Instalar el MCP
 
-La extensión no instala nada hasta que pulses **Instalar**. Estos pasos se pueden seguir a mano.
+## 0. Instalar la extensión (.vsix)
+
+Descarga `gimp-studio-agent-0.2.0.vsix` desde https://github.com/Edwardg-137/gimp-studio-agent/releases/latest.
+
+En VS Code, paleta **Extensions: Install from VSIX…**, o:
+
+```bash
+code --install-extension gimp-studio-agent-0.2.0.vsix
+```
+
+En Cursor: `cursor --install-extension gimp-studio-agent-0.2.0.vsix`. En Antigravity, la misma paleta, o su CLI si el IDE lo trae.
+
+Siguen haciendo falta GIMP 3 y el servidor `gimp-mcp`:
+
+```bash
+pip install twelvetake-gimp-studio-mcp
+gimp-mcp install-plugin
+gimp-mcp doctor
+```
+
+La extensión no instala nada de eso hasta que pulses **Instalar**. El detalle del MCP está debajo; con `pipx` en el PATH también vale el paso 1.
 
 ## 1. Servidor
 
