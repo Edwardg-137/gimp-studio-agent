@@ -1,0 +1,14 @@
+{
+  "name": "gimp-studio-agent",
+  "description": "Plugin GIMP Studio para Claude Code.",
+  "owner": {
+    "name": "Edwardg-137"
+  },
+  "plugins": [
+    {
+      "name": "gimp-studio",
+      "source": ".",
+      "description": "Skills de edición en GIMP 3 sobre el MCP gimp (gimp-mcp serve)."
+    }
+  ]
+}
