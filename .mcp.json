@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "gimp": {
+      "type": "stdio",
+      "command": "gimp-mcp",
+      "args": ["serve"]
+    }
+  }
+}

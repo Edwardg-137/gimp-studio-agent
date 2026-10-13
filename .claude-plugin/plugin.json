@@ -1,0 +1,10 @@
+{
+  "name": "gimp-studio",
+  "version": "0.2.0",
+  "description": "Skills de edición en GIMP 3 sobre el MCP gimp (gimp-mcp serve).",
+  "author": {
+    "name": "Edwardg-137"
+  },
+  "repository": "https://github.com/Edwardg-137/gimp-studio-agent",
+  "license": "MIT"
+}

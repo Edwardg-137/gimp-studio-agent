@@ -86,7 +86,7 @@ El cliente MCP debe arrancar:
 }
 ```
 
-Esa es la plantilla [mcp.example.json](../mcp.example.json). VS Code usa otro archivo, `.vscode/mcp.json`, con la clave `servers` y `"type": "stdio"`. Lo escriben la extensión (si el IDE no tiene la API de proveedores MCP) o la orden de instalar el agente. No borra otras entradas.
+Esa es la plantilla [mcp.example.json](../mcp.example.json). Claude Code y Codex: [claude-code.md](claude-code.md) y [codex.md](codex.md). VS Code usa otro archivo, `.vscode/mcp.json`, con la clave `servers` y `"type": "stdio"`. Lo escriben la extensión (si el IDE no tiene la API de proveedores MCP) o la orden de instalar el agente. No borra otras entradas.
 
 ## Variables
 

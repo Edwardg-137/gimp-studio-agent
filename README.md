@@ -11,6 +11,8 @@ El diseño está en [CONTEXTO.md](CONTEXTO.md). Instalación del MCP: [docs/inst
 | VS Code | [docs/vscode.md](docs/vscode.md) |
 | Antigravity | [docs/antigravity.md](docs/antigravity.md) |
 | Cursor | [docs/cursor.md](docs/cursor.md) |
+| Claude Code (plugin) | [docs/claude-code.md](docs/claude-code.md) |
+| Codex | [docs/codex.md](docs/codex.md) |
 
 Skills en `skills/`: `studio` enruta el brief y no salta `review` ni `export`. Además de abrir, editar, DTF, revisar y exportar: color, piel, selección, nitidez y composición. El oficio está en `rules/` (un archivo por tema). `gimp_exec` solo con los fragmentos de `rules/gimp-exec-snippets.md`. Plantilla MCP: [mcp.example.json](mcp.example.json).
 
