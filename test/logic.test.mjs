@@ -304,3 +304,11 @@ test("el plan de Cursor no toca rutas de Antigravity", () => {
   assert.ok(paths.includes(".cursor/rules/gimp-studio.mdc"));
   assert.equal(paths.some((p) => p.startsWith(".agents/")), false);
 });
+
+test("los JSON de Claude Code son válidos y coinciden", () => {
+  const read = (p) => JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", p), "utf8"));
+  const plugin = read(".claude-plugin/plugin.json");
+  const market = read(".claude-plugin/marketplace.json");
+  assert.deepEqual(read(".mcp.json").mcpServers.gimp, { type: "stdio", command: "gimp-mcp", args: ["serve"] });
+  assert.equal(market.plugins[0].name, plugin.name);
+});
